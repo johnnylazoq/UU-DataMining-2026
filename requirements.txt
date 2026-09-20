@@ -11,3 +11,4 @@ plotly
 jupyter
 streamlit
 pyyaml
+git
