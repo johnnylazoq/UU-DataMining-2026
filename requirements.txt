@@ -1,0 +1,13 @@
+text
+pandas
+numpy
+pyarrow
+networkx
+scikit-learn
+mlxtend
+matplotlib
+seaborn
+plotly
+jupyter
+streamlit
+pyyaml
