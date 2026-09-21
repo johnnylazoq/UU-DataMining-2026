@@ -7,7 +7,7 @@ from pathlib import Path
 import networkx as nx
 import pandas as pd
 
-from .io import write_processed_data
+from ..data.io import write_processed_data
 
 
 def extract_gatherings(clean_contacts: pd.DataFrame, config: dict) -> pd.DataFrame:

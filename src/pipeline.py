@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
-from .gatherings import extract_gatherings
-from .io import export_secondary_datasets
-from .preprocessing import clean_bluetooth_data
+from .data.io import export_secondary_datasets
+from .features.gatherings import extract_gatherings
+from .features.preprocessing import clean_bluetooth_data
 
 
 def resolve_path(path_value: str | Path, base_dir: Path) -> Path:

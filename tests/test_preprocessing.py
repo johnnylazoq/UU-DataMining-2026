@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.preprocessing import clean_bluetooth_data
+from src.features.preprocessing import clean_bluetooth_data
 
 
 def test_clean_bluetooth_data_filters_sentinels_and_creates_slots(

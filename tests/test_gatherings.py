@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.gatherings import extract_gatherings
+from src.features.gatherings import extract_gatherings
 
 
 def test_extract_gatherings_finds_connected_component(tmp_path: Path) -> None:

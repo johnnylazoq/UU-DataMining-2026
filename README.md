@@ -408,11 +408,11 @@ exports the secondary datasets.
 | Module | Responsibility |
 |---|---|
 | `src/config.py` | Load the YAML configuration |
-| `src/io.py` | Read raw CSV files and write processed Parquet files |
-| `src/preprocessing.py` | Filter Bluetooth records and create time slots |
-| `src/gatherings.py` | Build graphs and extract connected components |
+| `src/data/io.py` | Read raw CSV files and write processed Parquet files |
+| `src/features/preprocessing.py` | Filter Bluetooth records and create time slots |
+| `src/features/gatherings.py` | Build graphs and extract connected components |
 | `src/pipeline.py` | Orchestrate and validate pipeline stages |
-| `src/loader.py` | Backward-compatible imports for older notebooks |
+| `src/data/loader.py` | Backward-compatible imports for older notebooks |
 
 ### Streamlit dashboard
 
@@ -477,8 +477,8 @@ Deliverables:
 
 ```text
 01_data_audit.ipynb
-src/io.py
-src/preprocessing.py
+src/data/io.py
+src/features/preprocessing.py
 config/config.yaml
 docs/data_dictionary.md
 Initial exploratory figures
@@ -507,7 +507,7 @@ Deliverables:
 
 ```text
 02_gathering_extraction.ipynb
-src/gatherings.py
+src/features/gatherings.py
 src/features.py
 data/processed/contacts.parquet
 data/processed/coverage.parquet
@@ -603,14 +603,19 @@ campusgather/
 │   └── README.md                  # Notebook workflow
 ├── src/
 │   ├── __init__.py
-│   ├── io.py
-│   ├── preprocessing.py
-│   ├── gatherings.py
 │   ├── pipeline.py
-│   ├── loader.py                 # Backward-compatible imports
+│   ├── config.py
+│   ├── data/
+│   │   ├── __init__.py
+│   │   ├── io.py
+│   │   └── loader.py             # Backward-compatible imports
 │   ├── features/
-│   │   └── build.py
-│   └── models/                   # Clustering, anomaly, and forecasting modules
+│   │   ├── __init__.py
+│   │   ├── build.py
+│   │   ├── gatherings.py
+│   │   └── preprocessing.py
+│   └── models/
+│       └── __init__.py           # Clustering, anomaly, and forecasting modules
 ├── tests/
 │   ├── test_preprocessing.py
 │   └── test_gatherings.py
