@@ -1,4 +1,3 @@
-text
 pandas
 numpy
 pyarrow
@@ -11,4 +10,3 @@ plotly
 jupyter
 streamlit
 pyyaml
-git
