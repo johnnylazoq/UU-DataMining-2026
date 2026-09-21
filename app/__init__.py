@@ -1,0 +1,1 @@
+"""CampusGather Streamlit application."""

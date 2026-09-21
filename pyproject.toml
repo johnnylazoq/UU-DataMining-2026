@@ -3,6 +3,26 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "my_ml_project"
+name = "campusgather"
 version = "0.1.0"
-dependencies = []
+dependencies = [
+    "pandas",
+    "numpy",
+    "pyarrow",
+    "networkx",
+    "scikit-learn",
+    "mlxtend",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "jupyter",
+    "streamlit",
+    "pyyaml",
+]
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

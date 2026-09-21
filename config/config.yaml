@@ -1,0 +1,15 @@
+# Centralized analytical parameters for the CampusGather pipeline.
+
+paths:
+  raw_data_dir: "data/raw/7267433/"
+  processed_data_dir: "data/processed/"
+
+time_parameters:
+  slot_duration_sec: 300
+  time_decay_constant: 3600
+
+bluetooth_parameters:
+  rssi_thresholds: [-80, -85, -90]
+
+clustering_parameters:
+  min_gathering_size: 3

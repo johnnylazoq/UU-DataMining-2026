@@ -24,6 +24,7 @@ anonymized IDs and aggregate structural patterns.
 - [Forecasting Targets](#forecasting-targets)
 - [Evaluation](#evaluation)
 - [Application Features](#application-features)
+- [Current Implementation](#current-implementation)
 - [Team and Responsibilities](#team-and-responsibilities)
 - [Project Plan](#project-plan)
 - [Repository Structure](#repository-structure)
@@ -350,40 +351,30 @@ At minimum, compare proposed models against:
 
 ## Application Features
 
-The final prototype will be an exploratory dashboard or notebook-based app.
+The current prototype includes an exploratory Streamlit dashboard and notebooks.
 
 ### 1. Overview
 
-- Dataset coverage and active participants.
-- Current RSSI threshold and minimum gathering size.
-- Number of extracted gatherings and recurring cohorts.
-- Summary of anomaly and forecast outputs.
+- Contact-record count.
+- Active participant count.
+- Extracted gathering count.
+- Average gathering size.
 
 ### 2. Temporal activity view
 
-- Interaction and gathering activity by date and hour.
-- Activity distribution by day of week.
-- Optional comparison with external-device-presence frequency.
+- Contact activity by time slot.
+- RSSI distribution for retained contacts.
 
 ### 3. Gathering explorer
 
-For a selected detected gathering:
+- Filter gatherings by participant count.
+- View gathering-size distribution.
+- Inspect gathering ID, slot, participant count, timestamps, and mean RSSI.
 
-- Start/end time and duration.
-- Number of participants.
-- Proximity structure and density.
-- Communication and friendship features.
-- Cluster/archetype assignment.
-- Anomaly score.
-- External-presence indicator.
+### 4. Planned analysis views
 
-### 4. Recurring cohort explorer
-
-- Repeated participant groups.
-- Number of occurrences.
-- Support, confidence, and lift.
-- Time distribution of occurrences.
-- Sensitivity across RSSI thresholds.
+- Recurring cohorts, clustering, anomaly scores, and forecasting are planned analysis
+  surfaces and are not yet exposed by the current dashboard.
 
 ### 5. Forecast view
 
@@ -403,6 +394,47 @@ For a selected detected gathering:
 
 ---
 
+## Current Implementation
+
+The repository currently includes a modular preprocessing pipeline and a Streamlit
+dashboard.
+
+### Command-line pipeline
+
+[main.py](./main.py) is the command-line entry point. It loads the YAML configuration,
+validates input files, cleans Bluetooth data, extracts gatherings, and optionally
+exports the secondary datasets.
+
+| Module | Responsibility |
+|---|---|
+| `src/config.py` | Load the YAML configuration |
+| `src/io.py` | Read raw CSV files and write processed Parquet files |
+| `src/preprocessing.py` | Filter Bluetooth records and create time slots |
+| `src/gatherings.py` | Build graphs and extract connected components |
+| `src/pipeline.py` | Orchestrate and validate pipeline stages |
+| `src/loader.py` | Backward-compatible imports for older notebooks |
+
+### Streamlit dashboard
+
+[app/app.py](./app/app.py) provides an interactive dashboard based on processed
+Parquet files. It currently includes:
+
+- Pipeline overview metrics.
+- Contact and participant counts.
+- Extracted gathering count and average gathering size.
+- Gathering-size filtering and distribution chart.
+- Gathering records table.
+- RSSI distribution.
+- Contact activity by time slot.
+- Dataset reload control.
+- Missing-output guidance.
+- Privacy and interpretation notice.
+
+The dashboard is descriptive and aggregate. It does not identify people, assign
+semantic event labels, or make individual decisions.
+
+---
+
 ## Team and Responsibilities
 
 | Team member | Core responsibility | Course concepts | Main deliverables |
@@ -415,7 +447,7 @@ For a selected detected gathering:
 ### Collaboration rules
 
 - Use one shared repository and protected main branch.
-- Use one shared `config.yaml` and one loading/preprocessing module.
+- Use one shared `config/config.yaml` and the reusable modules in `src/`.
 - Store intermediate tables in documented schemas.
 - Version outputs when a definition changes, e.g. `gatherings_v1.parquet`.
 - Include parameter values, data version, and random seed in generated outputs.
@@ -558,44 +590,39 @@ Acceptance criteria:
 ```text
 campusgather/
 ├── README.md
+├── main.py                     # CLI entry point
+├── pyproject.toml
 ├── requirements.txt
 ├── .gitignore
 ├── config/
 │   └── config.yaml
 ├── data/
-│   ├── raw/                       # Usually excluded from Git
-│   └── processed/
-│       ├── contacts.parquet
-│       ├── coverage.parquet
-│       ├── gatherings_v1.parquet
-│       └── gathering_features_v1.parquet
+│   ├── raw/                       # Raw data, excluded from Git
+│   └── processed/                 # Generated Parquet, excluded from Git
 ├── notebooks/
-│   ├── 01_data_audit.ipynb
-│   ├── 02_gathering_extraction.ipynb
-│   ├── 03_cohort_mining.ipynb
-│   ├── 04_clustering.ipynb
-│   ├── 05_anomaly_detection.ipynb
-│   └── 06_forecasting.ipynb
+│   └── README.md                  # Notebook workflow
 ├── src/
 │   ├── __init__.py
 │   ├── io.py
 │   ├── preprocessing.py
 │   ├── gatherings.py
-│   ├── features.py
-│   ├── cohorts.py
-│   ├── clustering.py
-│   ├── anomalies.py
-│   └── forecasting.py
+│   ├── pipeline.py
+│   ├── loader.py                 # Backward-compatible imports
+│   ├── features/
+│   │   └── build.py
+│   └── models/                   # Clustering, anomaly, and forecasting modules
+├── tests/
+│   ├── test_preprocessing.py
+│   └── test_gatherings.py
 ├── app/
-│   └── app.py
+│   ├── __init__.py
+│   └── app.py                   # Streamlit dashboard
 ├── outputs/
-│   ├── figures/
-│   ├── tables/
-│   └── models/
+│   ├── figures/                   # Generated plots
+│   ├── tables/                    # Generated result tables
+│   └── models/                    # Trained model artifacts
 └── docs/
-    ├── data_dictionary.md
-    ├── methodology.md
-    └── presentation_outline.md
+    └── README.md
 ```
 
 ---
@@ -621,7 +648,7 @@ On Windows:
 pip install -r requirements.txt
 ```
 
-Suggested packages:
+The dependency file includes:
 
 ```text
 pandas
@@ -662,38 +689,126 @@ genders.csv
 
 ### 4. Configure analysis parameters
 
-Edit:
+Edit [config/config.yaml](./config/config.yaml):
 
 ```text
 config/config.yaml
 ```
 
-Example:
+Current configuration:
 
 ```yaml
-data:
-  raw_dir: data/raw
-  processed_dir: data/processed
+paths:
+  raw_data_dir: "data/raw/7267433/"
+  processed_data_dir: "data/processed/"
 
-bluetooth:
-  slot_seconds: 300
-  rssi_threshold: -85
+time_parameters:
+  slot_duration_sec: 300
+  time_decay_constant: 3600
+
+bluetooth_parameters:
+  rssi_thresholds: [-80, -85, -90]
+
+clustering_parameters:
   min_gathering_size: 3
-  merge_overlap_threshold: 0.6
-
-forecasting:
-  prediction_horizon_hours: 24
-  random_seed: 42
 ```
 
 ### 5. Run the pipeline
+
+Run the complete preprocessing pipeline:
+
+```bash
+python main.py
+```
+
+This processes Bluetooth data and exports:
+
+```text
+data/processed/contacts.parquet
+data/processed/coverage.parquet
+data/processed/gatherings_v1.parquet
+data/processed/fb_friends.parquet
+data/processed/genders.parquet
+data/processed/calls.parquet
+data/processed/sms.parquet
+```
+
+To process only Bluetooth data and gathering outputs:
+
+```bash
+python main.py --skip-secondary
+```
+
+Use another configuration file:
+
+```bash
+python main.py --config path/to/config.yaml
+```
+
+Override the raw-data directory:
+
+```bash
+python main.py --raw-dir data/raw/7267433
+```
+
+The raw directory must contain at least `bt_symmetric.csv`. Without
+`--skip-secondary`, it must also contain `fb_friends.csv`, `genders.csv`, `calls.csv`,
+and `sms.csv`.
+
+### 6. Run the notebooks
 
 ```bash
 jupyter notebook
 ```
 
-Run notebooks in numerical order, or provide a command-line workflow later as the project
-matures.
+Run notebooks in numerical order. Notebooks should import reusable functions from
+`src/` rather than duplicating preprocessing logic.
+
+### 7. Run the Streamlit dashboard
+
+After generating the processed datasets, start the dashboard from the project root:
+
+```bash
+streamlit run app/app.py
+```
+
+The dashboard reads:
+
+```text
+data/processed/contacts.parquet
+data/processed/gatherings_v1.parquet
+```
+
+Use the **Reload datasets** button after running the pipeline again. If these files do
+not exist, the dashboard displays an actionable error instead of silently showing
+empty results.
+
+### 8. Validate the installation
+
+Validate the Python modules and CLI without processing the dataset:
+
+```bash
+python -m py_compile main.py app/app.py src/*.py
+python main.py --help
+```
+
+Run a pipeline smoke test:
+
+```bash
+python main.py --skip-secondary
+```
+
+The current implementation has been verified to process the available dataset and
+produce contact and gathering Parquet outputs.
+
+Run the focused automated tests:
+
+```bash
+pytest
+```
+
+Generated datasets and output artifacts are ignored by Git. The directory
+placeholders remain tracked so the expected structure exists after cloning.
 
 ---
 
