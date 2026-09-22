@@ -9,6 +9,10 @@ time_parameters:
   time_decay_constant: 3600
 
 bluetooth_parameters:
+  # Active threshold used by every pipeline run.
+  # -80 is close contact, -90 also admits corridor / through-wall contacts.
+  rssi_threshold: -90
+  # Candidate values for the threshold sensitivity analysis.
   rssi_thresholds: [-80, -85, -90]
 
 clustering_parameters:
