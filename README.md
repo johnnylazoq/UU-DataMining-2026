@@ -194,7 +194,7 @@ duration_minutes
 participant_ids
 n_participants
 n_time_slots
-mean_rssi
+median_rssi
 graph_density
 rssi_threshold
 external_presence
@@ -369,7 +369,7 @@ The current prototype includes an exploratory Streamlit dashboard and notebooks.
 
 - Filter gatherings by participant count.
 - View gathering-size distribution.
-- Inspect gathering ID, slot, participant count, timestamps, and mean RSSI.
+- Inspect gathering ID, slot, participant count, timestamps, and median RSSI.
 
 ### 4. Planned analysis views
 
@@ -712,6 +712,7 @@ time_parameters:
   time_decay_constant: 3600
 
 bluetooth_parameters:
+  rssi_threshold: -90
   rssi_thresholds: [-80, -85, -90]
 
 clustering_parameters:
