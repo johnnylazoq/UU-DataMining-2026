@@ -18,6 +18,7 @@ dist/
 
 # Local configuration and secrets
 .env
+.streamlit/secrets.toml
 
 # Dataset and generated artifacts
 data/raw/*
