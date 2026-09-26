@@ -21,7 +21,7 @@ def test_clean_bluetooth_data_filters_sentinels_and_creates_slots(
         encoding="utf-8",
     )
     config = {
-        "bluetooth_parameters": {"rssi_thresholds": [-85, -90]},
+        "bluetooth_parameters": {"rssi_threshold": -85},
         "time_parameters": {"slot_duration_sec": 300},
         "paths": {"processed_data_dir": str(tmp_path / "processed")},
     }

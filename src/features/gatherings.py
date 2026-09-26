@@ -37,7 +37,7 @@ def extract_gatherings(clean_contacts: pd.DataFrame, config: dict) -> pd.DataFra
                     "participant_set": sorted(participants),
                     "start_time": component_data["timestamp"].min(),
                     "end_time": component_data["timestamp"].max(),
-                    "mean_rssi": component_data["rssi"].median(),
+                    "median_rssi": component_data["rssi"].median(),
                 }
             )
             gathering_id += 1

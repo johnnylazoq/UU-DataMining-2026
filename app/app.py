@@ -85,7 +85,7 @@ def render_gatherings(gatherings: pd.DataFrame) -> None:
             "participant_count",
             "start_time",
             "end_time",
-            "mean_rssi",
+            "median_rssi",
         ]
     ].head(100)
     st.dataframe(table, use_container_width=True, hide_index=True)

@@ -2,7 +2,7 @@
 import yaml
 import os
 
-def load_config(config_path="config.yaml"):
+def load_config(config_path="config/config.yaml"):
     """
     Reads the centralized YAML rulebook and returns it as a Python dictionary.
     """

@@ -19,7 +19,15 @@ def clean_bluetooth_data(
         subset=["timestamp", "user_a", "user_b", "rssi"]
     )
 
-    threshold = min(config["bluetooth_parameters"]["rssi_thresholds"])
+    # Read the active threshold explicitly. Previously this was
+    # min(rssi_thresholds), which silently pinned every run to -90 and meant the
+    # -80 / -85 entries in the config were never used.
+    threshold = config["bluetooth_parameters"]["rssi_threshold"]
+
+    # rssi < 0 is a validity guard, not an analytical choice: per
+    # bt_symmetric.README an RSSI of 0 only ever accompanies the user_b = -1
+    # empty-scan sentinel, so among real participant pairs this drops just 4
+    # physically impossible positive readings out of 5,474,289 rows.
     contacts = dataframe[
         (dataframe["user_a"] >= 0)
         & (dataframe["user_b"] >= 0)
