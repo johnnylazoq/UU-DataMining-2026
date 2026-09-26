@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 
 def load_bluetooth_data(filepath: str | Path) -> pd.DataFrame:
@@ -16,6 +17,41 @@ def load_bluetooth_data(filepath: str | Path) -> pd.DataFrame:
         names=["timestamp", "user_a", "user_b", "rssi"],
         header=None,
     )
+
+
+# Written by notebooks/eda_bt_symmetric.ipynb; the pipeline's Bluetooth input.
+PREPARED_BLUETOOTH_FILENAME = "bt_symmetric_prepared.parquet"
+
+# Columns the pipeline relies on. The notebook owner has agreed to keep these
+# names and meanings stable; extra columns (rssi_outlier, rssi_scaled) are ignored.
+PREPARED_BLUETOOTH_COLUMNS = [
+    "timestamp",
+    "user_a",
+    "user_b",
+    "rssi",
+    "is_empty_scan",
+    "is_external_device",
+    "is_valid_contact",
+]
+
+
+def load_prepared_bluetooth_data(filepath: str | Path) -> pd.DataFrame:
+    """Load the EDA-prepared Bluetooth rows and check the agreed columns exist."""
+    path = Path(filepath)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Missing {path}.\n"
+            "Run notebooks/eda_bt_symmetric.ipynb first; it writes this file."
+        )
+    available = pq.read_schema(path).names
+    missing = [c for c in PREPARED_BLUETOOTH_COLUMNS if c not in available]
+    if missing:
+        raise ValueError(
+            f"{path.name} is missing expected columns {missing}. "
+            "Re-run notebooks/eda_bt_symmetric.ipynb."
+        )
+    # Read only what the pipeline uses; skips the notebook's EDA-only columns.
+    return pd.read_parquet(path, columns=PREPARED_BLUETOOTH_COLUMNS)
 
 
 def load_facebook_data(filepath: str | Path) -> pd.DataFrame:
