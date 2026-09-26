@@ -15,6 +15,7 @@ def clean_bluetooth_data(
 ) -> pd.DataFrame:
     """Remove Bluetooth sentinels, apply the baseline RSSI filter, and slot time."""
     dataframe = load_bluetooth_data(filepath)
+    # Coerce every column to numeric and drop rows whose core fields fail to parse.
     dataframe = dataframe.apply(pd.to_numeric, errors="coerce").dropna(
         subset=["timestamp", "user_a", "user_b", "rssi"]
     )
@@ -34,8 +35,10 @@ def clean_bluetooth_data(
         & (dataframe["rssi"] < 0)
         & (dataframe["rssi"] >= threshold)
     ].copy()
+    # Sentinel rows (-1 empty scan, -2 non-study device) kept separately as evidence a phone was scanning.
     coverage = dataframe[dataframe["user_b"] < 0].copy()
 
+    # Bin each contact into a fixed-width time slot (the 5-minute scan interval).
     slot_duration = config["time_parameters"]["slot_duration_sec"]
     contacts["slot_id"] = (contacts["timestamp"] // slot_duration).astype("int64")
 
