@@ -634,6 +634,10 @@ campusgather/
 
 ## Setup
 
+> **Note:** Team members must run the EDA notebooks first as a required pipeline
+> step, before running the preprocessing pipeline (`main.py`) or the Streamlit
+> dashboard.
+
 ### 1. Create an environment
 
 ```bash
