@@ -402,14 +402,16 @@ dashboard.
 ### Command-line pipeline
 
 [main.py](./main.py) is the command-line entry point. It loads the YAML configuration,
-validates input files, cleans Bluetooth data, extracts gatherings, and optionally
-exports the secondary datasets.
+validates input files, filters the EDA-prepared Bluetooth rows
+(`data/processed/bt_symmetric_prepared.parquet`, written by
+`notebooks/eda_bt_symmetric.ipynb`) into slotted contacts, extracts gatherings, and
+optionally exports the secondary datasets.
 
 | Module | Responsibility |
 |---|---|
 | `src/config.py` | Load the YAML configuration |
-| `src/data/io.py` | Read raw CSV files and write processed Parquet files |
-| `src/features/preprocessing.py` | Filter Bluetooth records and create time slots |
+| `src/data/io.py` | Read raw CSV files and the prepared Bluetooth Parquet; write processed Parquet files |
+| `src/features/preprocessing.py` | Filter prepared Bluetooth records and create time slots |
 | `src/features/gatherings.py` | Build graphs and extract connected components |
 | `src/pipeline.py` | Orchestrate and validate pipeline stages |
 | `src/data/loader.py` | Backward-compatible imports for older notebooks |
@@ -636,7 +638,9 @@ campusgather/
 
 > **Note:** Team members must run the EDA notebooks first as a required pipeline
 > step, before running the preprocessing pipeline (`main.py`) or the Streamlit
-> dashboard.
+> dashboard. `notebooks/eda_bt_symmetric.ipynb` is a hard dependency: it writes
+> `data/processed/bt_symmetric_prepared.parquet`, which `main.py` reads instead of
+> `bt_symmetric.csv`, and `main.py` stops with an error if that file is missing.
 
 ### 1. Create an environment
 
@@ -761,9 +765,10 @@ Override the raw-data directory:
 python main.py --raw-dir data/raw/7267433
 ```
 
-The raw directory must contain at least `bt_symmetric.csv`. Without
-`--skip-secondary`, it must also contain `fb_friends.csv`, `genders.csv`, `calls.csv`,
-and `sms.csv`.
+`main.py` needs `data/processed/bt_symmetric_prepared.parquet` (run
+`notebooks/eda_bt_symmetric.ipynb` first; the notebook reads `bt_symmetric.csv`).
+Without `--skip-secondary`, the raw directory must also contain `fb_friends.csv`,
+`genders.csv`, `calls.csv`, and `sms.csv`.
 
 ### 6. Run the notebooks
 

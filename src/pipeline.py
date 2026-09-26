@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
-from .data.io import export_secondary_datasets
+from .data.io import PREPARED_BLUETOOTH_FILENAME, export_secondary_datasets
 from .features.gatherings import extract_gatherings
 from .features.preprocessing import clean_bluetooth_data
 
@@ -17,11 +17,22 @@ def resolve_path(path_value: str | Path, base_dir: Path) -> Path:
     return path if path.is_absolute() else base_dir / path
 
 
-def validate_input_files(raw_dir: Path, skip_secondary: bool = False) -> None:
-    """Raise a clear error when required raw files are absent."""
-    required = ["bt_symmetric.csv"]
-    if not skip_secondary:
-        required.extend(["fb_friends.csv", "genders.csv", "calls.csv", "sms.csv"])
+def validate_input_files(
+    raw_dir: Path,
+    processed_dir: Path,
+    skip_secondary: bool = False,
+) -> None:
+    """Raise a clear error when required input files are absent."""
+    prepared_bluetooth = processed_dir / PREPARED_BLUETOOTH_FILENAME
+    if not prepared_bluetooth.is_file():
+        raise FileNotFoundError(
+            f"Missing {prepared_bluetooth}.\n"
+            "Run notebooks/eda_bt_symmetric.ipynb first; the pipeline reads "
+            "its output instead of bt_symmetric.csv."
+        )
+    if skip_secondary:
+        return
+    required = ["fb_friends.csv", "genders.csv", "calls.csv", "sms.csv"]
     missing = [raw_dir / name for name in required if not (raw_dir / name).is_file()]
     if missing:
         formatted = "\n".join(f"  - {path}" for path in missing)
@@ -50,8 +61,8 @@ def run_pipeline(
     config["paths"]["raw_data_dir"] = str(raw_dir)
     config["paths"]["processed_data_dir"] = str(processed_dir)
 
-    validate_input_files(raw_dir, skip_secondary)
-    contacts = clean_bluetooth_data(raw_dir / "bt_symmetric.csv", config)
+    validate_input_files(raw_dir, processed_dir, skip_secondary)
+    contacts = clean_bluetooth_data(processed_dir / PREPARED_BLUETOOTH_FILENAME, config)
     gatherings = extract_gatherings(contacts, config)
     if not skip_secondary:
         export_secondary_datasets(config, raw_dir)
