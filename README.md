@@ -171,6 +171,7 @@ Core intermediate outputs:
 contacts.parquet
 coverage.parquet
 gatherings_v1.parquet
+episodes_v1.parquet
 gathering_features_v1.parquet
 ```
 
@@ -183,6 +184,7 @@ Bluetooth scans are sampled on a five-minute grid. For each time slot:
 3. Construct an undirected proximity graph.
 4. Extract connected components with a minimum size, initially `k >= 3`.
 5. Merge compatible components from consecutive slots into longer gathering episodes.
+   The linking rule and the frozen `episodes_v1` schema are in `docs/episodes.md`.
 
 A gathering episode contains:
 
@@ -741,11 +743,15 @@ This processes Bluetooth data and exports:
 data/processed/contacts.parquet
 data/processed/coverage.parquet
 data/processed/gatherings_v1.parquet
+data/processed/episodes_v1.parquet
 data/processed/fb_friends.parquet
 data/processed/genders.parquet
 data/processed/calls.parquet
 data/processed/sms.parquet
 ```
+
+The RSSI sensitivity table (-80, -85, -90 dBm) is produced separately and does not
+overwrite these files: `python -m src.rssi_sensitivity` (see `docs/episodes.md`).
 
 To process only Bluetooth data and gathering outputs:
 
