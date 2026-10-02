@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any
 
 from .config import load_config
-from .data.io import PREPARED_BLUETOOTH_FILENAME, export_secondary_datasets
+from .data.io import (
+    PREPARED_BLUETOOTH_FILENAME,
+    export_secondary_datasets,
+    write_processed_data,
+)
+from .features.episodes import build_episodes
 from .features.gatherings import extract_gatherings
 from .features.preprocessing import clean_bluetooth_data
 
@@ -64,6 +69,9 @@ def run_pipeline(
     validate_input_files(raw_dir, processed_dir, skip_secondary)
     contacts = clean_bluetooth_data(processed_dir / PREPARED_BLUETOOTH_FILENAME, config)
     gatherings = extract_gatherings(contacts, config)
+    # Episodes link the rows of gatherings_v1; theta and gap come from config.yaml.
+    episodes = build_episodes(gatherings, config)
+    write_processed_data(episodes, processed_dir, "episodes_v1.parquet")
     if not skip_secondary:
         export_secondary_datasets(config, raw_dir)
 
@@ -72,5 +80,6 @@ def run_pipeline(
         "processed_dir": processed_dir,
         "contacts": len(contacts),
         "gatherings": len(gatherings),
+        "episodes": len(episodes),
         "secondary_datasets": not skip_secondary,
     }
