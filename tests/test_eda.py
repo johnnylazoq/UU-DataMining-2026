@@ -15,6 +15,7 @@ from src.features.eda import (
 )
 
 
+# the report counts one repeated row, and the drop function removes it
 def test_duplicate_report_and_drop():
     df = pd.DataFrame({"a": [1, 1, 2], "b": [1, 1, 2]})
     report = duplicate_report(df)
@@ -24,6 +25,7 @@ def test_duplicate_report_and_drop():
     assert len(deduped) == 2
 
 
+# a self-loop (3,3) and the reversed edge (512,0) are reported and dropped, keeping (0,512)
 def test_symmetric_duplicate_report_and_drop():
     df = pd.DataFrame({"user_a": [0, 512, 3], "user_b": [512, 0, 3]})
     report = symmetric_duplicate_report(df, "user_a", "user_b")
@@ -35,6 +37,7 @@ def test_symmetric_duplicate_report_and_drop():
     assert deduped.iloc[0][["user_a", "user_b"]].tolist() == [0, 512]
 
 
+# the report counts one missing value in column a and none in column b
 def test_missingness_report():
     df = pd.DataFrame({"a": [1, None, 3], "b": [1, 2, 3]})
     report = missingness_report(df)
@@ -42,6 +45,7 @@ def test_missingness_report():
     assert report.loc["b", "n_missing"] == 0
 
 
+# the three strategies: drop the column, impute the median (2.0), or add an a_missing flag
 def test_apply_missing_strategy_variants():
     df = pd.DataFrame({"a": [1.0, None, 3.0]})
 
@@ -55,6 +59,7 @@ def test_apply_missing_strategy_variants():
     assert flagged["a_missing"].tolist() == [False, True, False]
 
 
+# the IQR rule marks only the value 100 as an outlier
 def test_outlier_report_and_flag():
     df = pd.DataFrame({"x": [1, 2, 3, 4, 100]})
     report = outlier_report_iqr(df, "x")
@@ -64,6 +69,7 @@ def test_outlier_report_and_flag():
     assert flagged["x_outlier"].tolist() == [False, False, False, False, True]
 
 
+# standard scaling adds an x_scaled column with mean 0
 def test_scale_numeric_columns_standard():
     df = pd.DataFrame({"x": [0.0, 10.0, 20.0]})
     scaled, scaler = scale_numeric_columns(df, ["x"], method="standard")
@@ -72,6 +78,7 @@ def test_scale_numeric_columns_standard():
     assert scaler is not None
 
 
+# robust scaling centres on the median, so the middle value maps to 0 despite the outlier 100
 def test_scale_numeric_columns_robust_ignores_outlier_magnitude():
     df = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 100.0]})
     scaled, scaler = scale_numeric_columns(df, ["x"], method="robust")

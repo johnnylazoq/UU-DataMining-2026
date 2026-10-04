@@ -7,6 +7,7 @@ import pandas as pd
 from src.features.gatherings import extract_gatherings
 
 
+# users 1-2-3 form one gathering, the pair 4-5 is too small, and gatherings_v1.parquet is written
 def test_extract_gatherings_finds_connected_component(tmp_path: Path) -> None:
     contacts = pd.DataFrame(
         [

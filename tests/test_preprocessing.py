@@ -28,6 +28,7 @@ def _write_prepared(path: Path) -> Path:
     return path
 
 
+# keeps only the valid contact above the RSSI threshold, adds slot_id, and writes the sentinel rows to coverage.parquet
 def test_clean_bluetooth_data_filters_sentinels_and_creates_slots(
     tmp_path: Path,
 ) -> None:
@@ -49,6 +50,7 @@ def test_clean_bluetooth_data_filters_sentinels_and_creates_slots(
     assert list(coverage.columns) == ["timestamp", "user_a", "user_b", "rssi"]
 
 
+# a prepared file without the is_valid_contact column raises a clear ValueError
 def test_clean_bluetooth_data_rejects_missing_columns(tmp_path: Path) -> None:
     source = tmp_path / "bt_symmetric_prepared.parquet"
     pd.DataFrame({"timestamp": [0], "user_a": [1], "user_b": [2], "rssi": [-80]}).to_parquet(source)
@@ -62,6 +64,7 @@ def test_clean_bluetooth_data_rejects_missing_columns(tmp_path: Path) -> None:
         clean_bluetooth_data(source, config)
 
 
+# a missing prepared file raises FileNotFoundError that points to the eda_bt_symmetric notebook
 def test_validate_input_files_points_to_notebook_when_prepared_file_missing(
     tmp_path: Path,
 ) -> None:
