@@ -44,6 +44,7 @@ def make_config(theta, gap):
     }
 
 
+# link_rows gives the hand-counted number of episodes for each (theta, gap) setting
 @pytest.mark.parametrize("theta, gap, n_expected", EXPECTED)
 def test_link_rows_matches_hand_count(theta, gap, n_expected):
     edges = candidate_edges(TOY_SLOTS, TOY_SETS, 0.4, 3)
@@ -51,12 +52,14 @@ def test_link_rows_matches_hand_count(theta, gap, n_expected):
     assert len(episodes) == n_expected
 
 
+# the full build_episodes gives the same hand counts as link_rows
 @pytest.mark.parametrize("theta, gap, n_expected", EXPECTED)
 def test_build_episodes_matches_hand_count(theta, gap, n_expected):
     result = build_episodes(make_toy_gatherings(), make_config(theta, gap))
     assert len(result) == n_expected
 
 
+# the output has the schema columns, and slots minus gap slots equals the number of rows in each episode
 def test_build_episodes_columns_and_row_counts():
     result = build_episodes(make_toy_gatherings(), make_config(0.6, 1))
     assert list(result.columns) == EPISODE_COLUMNS
@@ -65,6 +68,7 @@ def test_build_episodes_columns_and_row_counts():
         assert episode["n_slots"] - episode["n_gap_slots"] == n_rows
 
 
+# the sensitivity summary is correct for one drifting group and one stable trio
 def test_rssi_sensitivity_summary_on_hand_example():
     from src.rssi_sensitivity import summarise
 
