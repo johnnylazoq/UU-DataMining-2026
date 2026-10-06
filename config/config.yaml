@@ -17,3 +17,9 @@ bluetooth_parameters:
 
 clustering_parameters:
   min_gathering_size: 3
+
+episode_parameters:
+  # Rows of gatherings_v1 are linked into episodes: Jaccard >= threshold, at most
+  # max_gap_slots unseen slots in between. Chosen in notebooks/episodes_theta_gap.ipynb.
+  jaccard_threshold: 0.7
+  max_gap_slots: 1

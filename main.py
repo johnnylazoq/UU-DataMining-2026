@@ -46,6 +46,7 @@ def main() -> int:
 
     print(f"Processed contacts: {summary['contacts']}")
     print(f"Extracted gatherings: {summary['gatherings']}")
+    print(f"Built episodes: {summary['episodes']}")
     print(f"Processed data directory: {summary['processed_dir']}")
     if summary["secondary_datasets"]:
         print("Secondary datasets: exported")
