@@ -34,6 +34,8 @@ outputs/models/*
 !outputs/tables/.gitkeep
 # Small evidence table for the RSSI choice (3 rows); rerun: python -m src.rssi_sensitivity
 !outputs/tables/rssi_sensitivity_episodes.csv
+# Cohort table handed to the null-model work (343 rows); rerun: notebooks/cohort_analysis.ipynb
+!outputs/tables/recurring_cohorts.csv
 !outputs/models/.gitkeep
 
 # Editor and OS files
