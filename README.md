@@ -138,13 +138,9 @@ valid_contacts = bt[
 ].copy()
 ```
 
-A proximity threshold is then applied. The analysis will compare at least:
-
-```text
-RSSI >= -80 dBm
-RSSI >= -85 dBm
-RSSI >= -90 dBm
-```
+A proximity threshold is then applied. The analysis uses RSSI >= -90 dBm. The thresholds
+-80, -85 and -90 dBm were compared for gatherings and episodes (`docs/episodes.md`); the
+itemset and cohort results are for -90 dBm only.
 
 Because RSSI is a logarithmic signal-strength measurement and Bluetooth detection can
 be noisy, it is used as a proximity filter rather than an exact measure of distance.
@@ -201,8 +197,9 @@ external_presence
 pipeline_version
 ```
 
-We will compare connected-component and clique-based definitions where feasible, and
-we will report sensitivity to the RSSI threshold and minimum group size.
+We will compare connected-component and clique-based definitions where feasible. The
+sensitivity to the RSSI threshold was checked for gatherings and episodes and not repeated
+for the itemsets.
 
 ### 3. Recurring cohorts
 
@@ -219,6 +216,14 @@ We will mine recurring cohorts using:
 Closed and maximal itemsets will be prioritized to reduce redundant results and control
 candidate explosion. Support will be based on distinct gathering episodes, not raw
 five-minute Bluetooth observations.
+
+Implemented so far (notebooks in `notebooks/`, each one imports from `src/`):
+
+- `apriori_from_scratch.ipynb`: one transaction per episode, Apriori from scratch with the number of candidates per level, checked against mlxtend `apriori`, `fpgrowth` and `fpmax`; closed and maximal itemsets; how the number of itemsets grows as minimum support falls.
+- `association_rules.ipynb`: association rules from the frequent itemsets with confidence and lift, a toy example that can be checked by hand, and a comparison with mlxtend `association_rules`.
+- `cohort_analysis.ipynb`: a cohort is a closed itemset of at least two participants at a minimum support of 200 episodes (343 cohorts in `episodes_v1`). For each cohort it measures the days and weeks seen, regularity of weekday and hour, night share, share of large episodes and sessions, and writes `outputs/tables/recurring_cohorts.csv`.
+
+`recurring_cohorts.csv` is tracked in Git (an exception in `.gitignore`) because the null-model validation starts from it. Still open: null-model validation of the cohorts. The RSSI sensitivity was not repeated at itemset level, so the cohorts are for -90 dBm only.
 
 ### 4. Gathering archetypes
 
@@ -404,7 +409,7 @@ dashboard.
 [main.py](./main.py) is the command-line entry point. It loads the YAML configuration,
 validates input files, filters the EDA-prepared Bluetooth rows
 (`data/processed/bt_symmetric_prepared.parquet`, written by
-`notebooks/eda_bt_symmetric.ipynb`) into slotted contacts, extracts gatherings, and
+`notebooks/eda_bt_symmetric.ipynb`) into slotted contacts, extracts gatherings, links them into episodes, and
 optionally exports the secondary datasets.
 
 | Module | Responsibility |
@@ -413,8 +418,22 @@ optionally exports the secondary datasets.
 | `src/data/io.py` | Read raw CSV files and the prepared Bluetooth Parquet; write processed Parquet files |
 | `src/features/preprocessing.py` | Filter prepared Bluetooth records and create time slots |
 | `src/features/gatherings.py` | Build graphs and extract connected components |
+| `src/features/episodes.py` | Link slot-level gatherings into episodes (Jaccard threshold and gap tolerance from the config) |
+| `src/features/transactions.py` | One transaction per episode, support counts, one-hot table for frequent-pattern mining |
+| `src/rssi_sensitivity.py` | Run the pipeline at each RSSI threshold on a temporary copy of the config (gatherings and episodes) |
 | `src/pipeline.py` | Orchestrate and validate pipeline stages |
 | `src/data/loader.py` | Backward-compatible imports for older notebooks |
+
+### Episode and cohort notebooks
+
+| Notebook | What it does |
+|---|---|
+| `notebooks/episodes_theta_gap.ipynb` | Choice of the episode linking parameters (threshold and gap) |
+| `notebooks/apriori_from_scratch.ipynb` | Frequent, closed and maximal itemsets, Apriori from scratch against mlxtend |
+| `notebooks/association_rules.ipynb` | Association rules, confidence and lift |
+| `notebooks/cohort_analysis.ipynb` | Recurring cohorts and `outputs/tables/recurring_cohorts.csv` |
+
+The notebooks are committed without stored outputs; run them to produce the results.
 
 ### Streamlit dashboard
 
@@ -441,8 +460,8 @@ semantic event labels, or make individual decisions.
 
 | Team member | Core responsibility | Course concepts | Main deliverables |
 |---|---|---|---|
-| **Emmanouil Vettas** | Shared Bluetooth data foundation, gathering extraction, recurring-cohort analysis | Association-rule mining, Apriori, FP-Growth, closed/maximal itemsets | Clean contact pipeline, versioned gathering table, cohort-mining results, threshold sensitivity analysis |
-| **Sotirios Oikonomou** | Gathering feature engineering, dimensionality reduction, clustering and archetype analysis | Feature normalization, distance measures, clustering, cluster validity | Gathering-feature table, clustering pipeline, validity results, archetype descriptions and figures |
+| **Sotirios Oikonomou** | Gathering extraction (linking gatherings into episodes), transactions for pattern mining, recurring-cohort analysis | Association-rule mining, Apriori, FP-Growth, closed/maximal itemsets | `episodes_v1` and its schema (`docs/episodes.md`), RSSI sensitivity of episodes, transactions, Apriori from scratch, closed and maximal itemsets, association rules, `recurring_cohorts.csv` with the cohort analysis |
+| **Emmanouil Vettas** | Gathering feature engineering, dimensionality reduction, clustering and archetype analysis | Feature normalization, distance measures, clustering, cluster validity | Gathering-feature table, clustering pipeline, validity results, archetype descriptions and figures |
 | **Johnny Israel Lazo Quinonez** | Anomaly detection, temporal/null validation, forecasting evaluation | Distance-based anomalies, LOF, Isolation Forest, temporal validation | Anomaly pipeline, baseline/null-model comparisons, forecast experiments and evaluation |
 | **All members** | Integration, code review, interpretation, app prototype, report, and presentation | Reproducibility, ethical analysis, scientific communication | Shared repository, final outputs, dashboard/demo, report, and presentation |
 
@@ -500,7 +519,7 @@ Goals:
 - Construct per-slot participant proximity graphs.
 - Extract connected components with the initial definition `k >= 3`.
 - Test merging rules for consecutive components.
-- Compare RSSI thresholds `-80`, `-85`, and `-90 dBm`.
+- Compare RSSI thresholds `-80`, `-85`, and `-90 dBm` on gatherings and episodes, then continue with `-90 dBm`.
 - Produce `contacts.parquet`, `coverage.parquet`, and `gatherings_v1.parquet`.
 - Build the first gathering-level feature table using Bluetooth, friendship, calls, and SMS.
 - Define chronological train/validation/test windows and simple prediction baselines.
@@ -538,7 +557,7 @@ Goals:
 Deliverables:
 
 ```text
-03_cohort_mining.ipynb
+03_cohort_mining.ipynb   # implemented as apriori_from_scratch, association_rules and cohort_analysis
 04_clustering.ipynb
 05_anomaly_detection.ipynb
 outputs/tables/recurring_cohorts.csv
@@ -602,11 +621,17 @@ campusgather/
 │   ├── raw/                       # Raw data, excluded from Git
 │   └── processed/                 # Generated Parquet, excluded from Git
 ├── notebooks/
-│   └── README.md                  # Notebook workflow
+│   ├── README.md                  # Notebook workflow
+│   ├── eda_*.ipynb                # EDA: Bluetooth, calls, SMS, friends, genders
+│   ├── episodes_theta_gap.ipynb   # Episode linking parameters
+│   ├── apriori_from_scratch.ipynb # Frequent, closed and maximal itemsets
+│   ├── association_rules.ipynb    # Rules with confidence and lift
+│   └── cohort_analysis.ipynb      # Recurring cohorts, writes recurring_cohorts.csv
 ├── src/
 │   ├── __init__.py
 │   ├── pipeline.py
 │   ├── config.py
+│   ├── rssi_sensitivity.py
 │   ├── data/
 │   │   ├── __init__.py
 │   │   ├── io.py
@@ -614,22 +639,29 @@ campusgather/
 │   ├── features/
 │   │   ├── __init__.py
 │   │   ├── build.py
+│   │   ├── eda.py
+│   │   ├── episodes.py
 │   │   ├── gatherings.py
-│   │   └── preprocessing.py
+│   │   ├── preprocessing.py
+│   │   └── transactions.py
 │   └── models/
 │       └── __init__.py           # Clustering, anomaly, and forecasting modules
 ├── tests/
+│   ├── test_eda.py
+│   ├── test_episodes.py
+│   ├── test_gatherings.py
 │   ├── test_preprocessing.py
-│   └── test_gatherings.py
+│   └── test_transactions.py
 ├── app/
 │   ├── __init__.py
 │   └── app.py                   # Streamlit dashboard
 ├── outputs/
 │   ├── figures/                   # Generated plots
-│   ├── tables/                    # Generated result tables
+│   ├── tables/                    # Generated result tables (recurring_cohorts.csv and rssi_sensitivity_episodes.csv are tracked)
 │   └── models/                    # Trained model artifacts
 └── docs/
-    └── README.md
+    ├── README.md
+    └── episodes.md
 ```
 
 ---
@@ -778,6 +810,9 @@ jupyter notebook
 
 Run notebooks in numerical order. Notebooks should import reusable functions from
 `src/` rather than duplicating preprocessing logic.
+
+To rebuild `outputs/tables/recurring_cohorts.csv`, run the pipeline (`python main.py`) and then
+`notebooks/cohort_analysis.ipynb`; it reads `data/processed/episodes_v1.parquet`.
 
 ### 7. Run the Streamlit dashboard
 
