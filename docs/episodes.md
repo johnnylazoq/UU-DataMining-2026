@@ -13,7 +13,7 @@ that stays together appears in many rows. An episode links those rows over time.
 - Each row gets at most one successor and one predecessor. Candidate links are taken
   in the order: fewest skipped slots, then highest J (greedy).
 - Both settings are in `config/config.yaml` under `episode_parameters`
-  (currently 0.7 and 1, tentative until the team confirms).
+  (0.7 and 1).
 - Code: `src/features/episodes.py`. The choice of the two values is documented in
   `notebooks/episodes_theta_gap.ipynb`.
 
