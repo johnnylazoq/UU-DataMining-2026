@@ -1,0 +1,5 @@
+method,n_flagged
+kNN,1126
+LOF,1127
+IsolationForest,1127
+OneClassSVM,1277
