@@ -38,3 +38,7 @@ archetype_clustering_parameters:
   # Independent partitions, not levels of a hierarchy.
   coarse_k: 2
   descriptive_k: 5
+
+# Seeds used for initialization-stability comparisons.
+cluster_stability_parameters:
+  seeds: [1, 2, 3, 4, 5]
