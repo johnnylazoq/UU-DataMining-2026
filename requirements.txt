@@ -10,3 +10,7 @@ plotly
 jupyter
 streamlit
 pyyaml
+fastapi
+uvicorn[standard]
+redis
+rq

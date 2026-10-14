@@ -46,7 +46,10 @@ def extract_gatherings(clean_contacts: pd.DataFrame, config: dict) -> pd.DataFra
             )
             gathering_id += 1
 
-    result = pd.DataFrame(gatherings)
+    result = pd.DataFrame(
+        gatherings,
+        columns=["slot_id", "gathering_id", "participant_set", "start_time", "end_time", "median_rssi"],
+    )
     # Versioned filename: bump to v2 if the gathering definition changes.
     write_processed_data(
         result,

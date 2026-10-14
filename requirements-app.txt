@@ -1,0 +1,10 @@
+pandas
+numpy
+pyarrow
+scikit-learn
+networkx
+pyyaml
+fastapi
+uvicorn[standard]
+redis
+rq
