@@ -140,7 +140,7 @@ def test_itemset_pages_minimum_support_changes_computed_result(tmp_path, monkeyp
     low = analysis_compute.compute_analysis(analysis_id, {"min_support": 200}, tmp_path / "low")
     high = analysis_compute.compute_analysis(analysis_id, {"min_support": 201}, tmp_path / "high")
     assert low["metrics"]["frequent_itemsets"] > high["metrics"]["frequent_itemsets"]
-    assert low["metrics"]["cohorts" if analysis_id == "cohorts" else "rules"] > high["metrics"]["cohorts" if analysis_id == "cohorts" else "rules"]
+    assert low["metrics"]["closed_itemsets" if analysis_id == "cohorts" else "rules"] > high["metrics"]["closed_itemsets" if analysis_id == "cohorts" else "rules"]
 
 
 def test_registry_offers_no_unimplemented_anomaly_detector():

@@ -38,10 +38,10 @@ def registry() -> dict[str, dict[str, Any]]:
         schemas: dict[str, dict[str, Any]] = {
             "rssi_threshold": {"type": "enum", "values": rssi_values, "label": "RSSI threshold (dBm)"},
             "min_gathering_size": {"type": "integer", "minimum": 2, "label": "Minimum gathering size"},
-            "jaccard_threshold": {"type": "number", "minimum": 0, "maximum": 1, "step": 0.05, "label": "Jaccard threshold"},
-            "max_gap_slots": {"type": "integer", "minimum": 0, "label": "Maximum missing slots"},
+            "jaccard_threshold": {"type": "enum", "values": [0.6, 0.7, 0.8], "label": "Jaccard threshold (θ)"},
+            "max_gap_slots": {"type": "enum", "values": [0, 1, 2], "label": "Maximum missing slots (g)"},
             "communication_lookback_hours": {"type": "integer", "minimum": 1, "label": "Communication lookback (hours)"},
-            "min_support": {"type": "integer", "minimum": 200, "label": "Minimum episode support"},
+            "min_support": {"type": "integer", "minimum": 100, "maximum": 400, "label": "Minimum episode support"},
             "representation": {"type": "enum", "values": list(features), "label": "Feature representation"},
             "k": {"type": "enum", "values": [int(k) for k in cluster["k_values"]], "label": "Cluster count (k)"},
             "seed": {"type": "enum", "values": sorted(set([int(cluster["random_seed"]), *map(int, config["cluster_stability_parameters"]["seeds"])])), "label": "Random seed"},

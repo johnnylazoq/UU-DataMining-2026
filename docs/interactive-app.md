@@ -2,10 +2,9 @@
 
 The web application exposes the implemented CampusGather workflows through the
 existing API, Redis/RQ worker, per-run metadata, cache, and artifact routes.
-Parameter defaults come from `config/config.yaml`; cohort and association
-minimum support is 200 because that is the setting in the corresponding
-notebooks. The anomaly page stays explicitly unsupported because no detector or
-detector schema exists in the repository.
+Pipeline parameter defaults come from `config/config.yaml`. The documented
+itemset schema uses minimum support 200 by default, with a supported range of
+100–400. There is no anomaly page or anomaly control in the app.
 
 ## Start locally
 
@@ -28,16 +27,25 @@ configuration, all source input fingerprints, analysis ID, and full parameter se
   summaries.
 - **Gatherings:** RSSI threshold and minimum component size; recomputes contacts
   and connected components.
-- **Episodes:** RSSI threshold, minimum component size, Jaccard threshold, and
-  maximum slot gap; rebuilds gatherings and episode links using those same values.
+- **Episodes:** RSSI threshold, minimum component size, Jaccard threshold
+  (0.6/0.7/0.8), and maximum slot gap (0/1/2); rebuilds gatherings and episode
+  links with the same snapshot. Canonical episode-count, one-slot, and drift
+  checks gate the displayed result.
 - **Clustering:** feature representation, k, seed, starts, silhouette sample
   size, plus all upstream settings including communication lookback. Changing k
   reuses the features produced inside the run; changing an upstream setting
   rebuilds all dependent stages.
-- **Cohorts and association rules:** upstream episode settings and minimum
-  support. Their frequent itemsets and tables are recomputed for each run.
-- **Anomalies:** unsupported; no setting is offered because the codebase has no
-  implemented detector.
+- **Recurring cohorts:** RSSI, minimum gathering size, θ, g, and minimum support
+  (100–400). Live runs call `build_transactions`, repository `apriori`,
+  `find_closed`, and `find_maximal`; checked runs compare exact supports with
+  mlxtend and report both runtimes. Saved cohort measures remain separate.
+- **RSSI sensitivity:** precomputed only; reads the saved sensitivity CSV, whose
+  canonical -90 dBm counts are checked before display.
+- **Cohort drill-down:** reads measures from `recurring_cohorts.csv` and filters
+  `episodes_v1.parquet` for the selected member set. It does no new mining.
+- **Association rules:** uses repository `apriori` and `make_rules`; confidence,
+  lift, and top-N controls filter the returned rule table and scatter plot
+  immediately. The toy example and canonical real-data counts are checked.
 
 Display search/sort controls apply immediately. Expensive pipeline work requires
 the explicit **Run analysis** action. Job states and submitted settings are
@@ -45,12 +53,11 @@ recorded in run metadata. Exact successful matches may be reused; every other
 run remains isolated from baseline files.
 
 The pipeline uses the existing graph-component, greedy Jaccard continuation,
-communication-window, K-Means, association-rule, and closed-itemset definitions.
-The one-hour cohort session gap and 95th-percentile episode-size flag are retained
-from `notebooks/cohort_analysis.ipynb`, not exposed as new controls. Result tables
-omit participant identifiers; run-specific episode IDs are only present in the
-clustering assignment download. All timestamps remain relative to the source
-time origin.
+communication-window, K-Means, Apriori, and rule-generation functions. The
+one-hour cohort session gap remains the notebook implementation's fixed setting.
+Itemset and rule tables contain participant IDs as in the source outputs; cohort
+drill-down contains aggregate day and hour counts. All timestamps remain relative
+to the source time origin.
 
 ## Services
 

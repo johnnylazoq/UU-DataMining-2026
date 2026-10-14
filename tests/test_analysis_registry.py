@@ -20,7 +20,7 @@ def test_each_implemented_report_has_validated_backend_defaults():
     assert definitions["associations"]["defaults"]["min_support"] == 200
     assert validate_parameters("cohorts", {"min_support": 201})["min_support"] == 201
     with pytest.raises(ValueError):
-        validate_parameters("associations", {"min_support": 199})
+        validate_parameters("associations", {"min_support": 99})
     assert "anomalies" not in definitions
 
 

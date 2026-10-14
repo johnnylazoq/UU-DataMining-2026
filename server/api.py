@@ -178,7 +178,7 @@ def get_baseline():
 
 @app.get("/api/baseline/artifacts/{name}")
 def get_baseline_artifact(name: str):
-    allowed = {"cluster_validity_normalized_without_gap.csv", "cluster_seed_stability_summary.csv"}
+    allowed = {"cluster_validity_normalized_without_gap.csv", "cluster_seed_stability_summary.csv", "rssi_sensitivity_episodes.csv", "recurring_cohorts.csv"}
     if name not in allowed:
         raise HTTPException(404, "Baseline artifact not found")
     path = ROOT / "outputs" / "tables" / name
@@ -188,9 +188,67 @@ def get_baseline_artifact(name: str):
 
 
 @app.get("/api/exploration/{section}")
-def get_exploration(section: str):
-    """Small aggregate views over saved data; never returns participant records."""
+def get_exploration(section: str, cohort: str | None = None):
+    """Read aggregate saved views and selected anonymous cohort summaries."""
     processed = ROOT / "data" / "processed"
+    if section == "rssi":
+        path = ROOT / "outputs" / "tables" / "rssi_sensitivity_episodes.csv"
+        if not path.is_file():
+            raise HTTPException(404, "Saved RSSI sensitivity table is unavailable")
+        frame = pd.read_csv(path)
+        selected = frame.loc[frame["rssi_threshold"] == -90]
+        if selected.empty:
+            raise HTTPException(409, "Saved RSSI table has no -90 dBm reference row")
+        row = selected.iloc[0]
+        observed = (int(row["contacts"]), int(row["gatherings"]), int(row["episodes"]))
+        if observed != (1603916, 98194, 22530):
+            raise HTTPException(409, f"Saved RSSI reference check failed: observed {observed}")
+        return {"status": "saved precomputed table", "rows": frame.to_dict(orient="records"), "note": "Saved notebook output. RSSI sensitivity is not recomputed in the web app."}
+    if section == "cohort-list":
+        path = ROOT / "outputs" / "tables" / "recurring_cohorts.csv"
+        if not path.is_file():
+            raise HTTPException(404, "Saved recurring cohort table is unavailable")
+        frame = pd.read_csv(path)
+        reference = frame.loc[frame["members"].astype(str).str.replace(",", " ").str.split().str.join(" ") == "47 449"]
+        if reference.empty:
+            raise HTTPException(409, "Saved cohort table is missing the canonical (47, 449) reference")
+        row = reference.iloc[0]
+        observed = (int(row["support"]), int(row["days_seen"]), int(row["weeks_seen"]), int(row["support_first_half"]), int(row["support_second_half"]), int(row["sessions_1h"]))
+        if observed != (523, 24, 4, 279, 244, 50) or abs(float(row["night_episode_share"]) - 0.449) > 0.001 or row["episodes_version"] != "episodes_v1" or (int(row["minsup"]), float(row["jaccard_threshold"]), int(row["max_gap_slots"]), int(row["rssi_threshold"])) != (200, 0.7, 1, -90):
+            raise HTTPException(409, f"Saved cohort reference check failed: observed {observed}")
+        return {"rows": frame[["members", "size", "support", "days_seen", "weeks_seen", "support_first_half", "support_second_half", "night_episode_share", "sessions_1h"]].to_dict(orient="records"), "source": "outputs/tables/recurring_cohorts.csv"}
+    if section == "cohort-drilldown":
+        if not cohort:
+            raise HTTPException(422, "Select a cohort first")
+        try:
+            members = tuple(sorted({int(value) for value in cohort.replace(",", " ").split()}))
+        except ValueError as exc:
+            raise HTTPException(422, "Cohort members must be student IDs") from exc
+        if len(members) < 2:
+            raise HTTPException(422, "A cohort must contain at least two members")
+        baseline_path = ROOT / "outputs" / "tables" / "recurring_cohorts.csv"
+        episodes_path = processed / "episodes_v1.parquet"
+        if not baseline_path.is_file() or not episodes_path.is_file():
+            raise HTTPException(404, "Saved cohort or episode data is unavailable")
+        baseline = pd.read_csv(baseline_path)
+        cohort_key = " ".join(map(str, members))
+        saved = baseline.loc[baseline["members"].astype(str).str.replace(",", " ").str.split().str.join(" ") == cohort_key]
+        if saved.empty:
+            raise HTTPException(404, "Cohort is not in the saved recurring cohort table")
+        row = saved.iloc[0]
+        episodes = pd.read_parquet(episodes_path, columns=["episode_id", "participant_set", "start_time", "end_time", "start_hour", "night_share"])
+        matching = episodes.loc[episodes["participant_set"].map(lambda value: set(members).issubset(set(map(int, value))))].copy()
+        day = (matching["start_time"] // 86400).astype(int)
+        days = day.value_counts().sort_index()
+        hours = matching["start_hour"].value_counts().sort_index()
+        from src.features.cohorts import count_sessions
+        session_count = count_sessions(matching, 3600, config_snapshot()["time_parameters"]["slot_duration_sec"])
+        check = (len(matching), int(day.nunique()), int((day // 7).nunique()), session_count)
+        saved_check = (int(row["support"]), int(row["days_seen"]), int(row["weeks_seen"]), int(row["support_first_half"]), int(row["support_second_half"]), int(row["sessions_1h"]))
+        if members == (47, 449) and (check != (523, 24, 4, 50) or saved_check != (523, 24, 4, 279, 244, 50) or abs(float(row["night_episode_share"]) - 0.449) > 0.001):
+            raise HTTPException(409, f"Saved cohort check failed for {members}: observed {check}")
+        saved_metrics = {key: value.item() if hasattr(value, "item") else value for key, value in row.items() if key not in {"members", "episodes_version", "minsup", "jaccard_threshold", "max_gap_slots", "rssi_threshold"}}
+        return {"members": members, "parameters": {"source": "recurring_cohorts.csv + episodes_v1.parquet", "episodes_version": row["episodes_version"], "minsup": int(row["minsup"]), "jaccard_threshold": float(row["jaccard_threshold"]), "max_gap_slots": int(row["max_gap_slots"]), "rssi_threshold": int(row["rssi_threshold"])}, "metrics": saved_metrics, "verified_episode_rows": int(len(matching)), "charts": [{"title": "Selected cohort episodes by relative day", "x_title": "Relative day index", "y_title": "Episodes", "x": [int(value) for value in days.index], "y": [int(value) for value in days.values]}, {"title": "Selected cohort episodes by start hour", "x_title": "Relative start hour", "y_title": "Episodes", "x": [int(value) for value in hours.index], "y": [int(value) for value in hours.values]}]}
     if section == "bluetooth":
         config = config_snapshot()
         path = processed / "contacts.parquet"

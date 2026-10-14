@@ -1,9 +1,9 @@
 """Run-scoped implementations shared by the interactive analysis jobs."""
 from __future__ import annotations
 
-from itertools import combinations
 import json
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import numpy as np
@@ -132,45 +132,6 @@ def build_lineage(params: dict[str, Any], work_dir: Path, lineage_cache_key: str
     return {"config": config, "contacts": contacts, "gatherings": gatherings, "episodes": episodes, "features": features, "provenance": provenance, "lineage_cache_hit": False}
 
 
-def _apriori_supports(transactions: list[frozenset[int]], min_support: int) -> dict[tuple[int, ...], int]:
-    """Apriori itemset mining with vertical episode bitmaps for efficient exact support counts."""
-    item_masks: dict[int, int] = {}
-    for index, transaction in enumerate(transactions):
-        bit = 1 << index
-        for item in transaction:
-            item_masks[item] = item_masks.get(item, 0) | bit
-    supports: dict[tuple[int, ...], int] = {}
-    level_masks = {(item,): mask for item, mask in item_masks.items() if mask.bit_count() >= min_support}
-    level_counts = {key: mask.bit_count() for key, mask in level_masks.items()}
-    supports.update(level_counts)
-    size = 2
-    while level_masks:
-        previous = set(level_masks)
-        ordered = sorted(level_masks)
-        candidates: set[tuple[int, ...]] = set()
-        for i, left in enumerate(ordered):
-            for right in ordered[i + 1:]:
-                if left[:-1] != right[:-1]:
-                    continue
-                candidate = left + (right[-1],)
-                if all(tuple(subset) in previous for subset in combinations(candidate, size - 1)):
-                    candidates.add(candidate)
-        next_masks: dict[tuple[int, ...], int] = {}
-        for candidate in candidates:
-            mask = level_masks[candidate[:-1]] & item_masks[candidate[-1]]
-            if mask.bit_count() >= min_support:
-                next_masks[candidate] = mask
-        level_masks = next_masks
-        supports.update({key: mask.bit_count() for key, mask in level_masks.items()})
-        size += 1
-    return supports
-
-
-def _transactions(episodes: pd.DataFrame) -> list[frozenset[int]]:
-    ordered = episodes.sort_values("episode_id")
-    return [frozenset(map(int, members)) for members in ordered["participant_set"]]
-
-
 def compute_analysis(analysis_id: str, params: dict[str, Any], run_dir: Path, lineage_cache_key: str | None = None) -> dict[str, Any]:
     """Compute one registered report and write only aggregate/run-scoped artifacts."""
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -200,7 +161,15 @@ def compute_analysis(analysis_id: str, params: dict[str, Any], run_dir: Path, li
     elif analysis_id == "episodes":
         spans = episodes["n_slots"].value_counts().sort_index()
         distribution = spans.rename_axis("covered_slots").rename("episodes").reset_index()
-        metrics = {"episodes": int(len(episodes)), "median_slots": float(episodes["n_slots"].median()) if len(episodes) else None, "episodes_with_gaps": int((episodes["n_gap_slots"] > 0).sum()), "median_union_size": float(episodes["participant_set"].map(len).median()) if len(episodes) else None}
+        from src.rssi_sensitivity import summarise
+        sensitivity = summarise(params["rssi_threshold"], contacts, gatherings, episodes)
+        metrics = {"episodes": int(len(episodes)), "median_slots": float(episodes["n_slots"].median()) if len(episodes) else None, "episodes_with_gaps": int((episodes["n_gap_slots"] > 0).sum()), "median_union_size": float(episodes["participant_set"].map(len).median()) if len(episodes) else None, "contacts": sensitivity["contacts"], "gatherings": sensitivity["gatherings"], "one_slot_share_pct": sensitivity["one_slot_share_pct"], "drift_pct": sensitivity["drift_pct"]}
+        if params["rssi_threshold"] == -90 and params["min_gathering_size"] == 3:
+            expected = {(0.7, 1): (22530, 54.9, 6.3), (0.6, 1): (18269, 51.2, 17.3), (0.8, 1): (29411, 60.7, 1.0)}.get((params["jaccard_threshold"], params["max_gap_slots"]))
+            if expected:
+                observed = (metrics["episodes"], metrics["one_slot_share_pct"], metrics["drift_pct"])
+                if observed[0] != expected[0] or abs(observed[1] - expected[1]) > 0.15 or abs(observed[2] - expected[2]) > 0.15:
+                    raise ValueError(f"Episode check failed for θ={params['jaccard_threshold']}, g={params['max_gap_slots']}: got {observed}, expected {expected}")
         charts = [{"title": "Episode span distribution", "x_title": "Covered five-minute slots (gaps included)", "y_title": "Episodes", "x": distribution["covered_slots"].astype(int).tolist(), "y": distribution["episodes"].astype(int).tolist()}]
         tables["episode_span_distribution"] = distribution
     elif analysis_id == "clustering":
@@ -235,70 +204,68 @@ def compute_analysis(analysis_id: str, params: dict[str, Any], run_dir: Path, li
         tables["coordinates"] = pd.DataFrame({"episode_id": eligible["episode_id"], "pc1": coordinates[:, 0], "pc2": coordinates[:, 1], "cluster_id": labels})
         charts = [{"title": "Run-specific PCA view", "x_title": "Principal component 1", "y_title": "Principal component 2", "x": tables["coordinates"]["pc1"].tolist(), "y": tables["coordinates"]["pc2"].tolist()}]
     elif analysis_id in {"cohorts", "associations"}:
-        transactions = _transactions(episodes)
+        from src.features.transactions import build_transactions, to_one_hot
+        from src.models.itemsets import apriori, find_closed, find_maximal, levels_to_counts, mlxtend_to_counts
+        transactions = build_transactions(episodes)
         min_support = params["min_support"]
-        supports = _apriori_supports(transactions, min_support)
+        started = perf_counter()
+        levels, level_table = apriori(transactions, min_support)
+        apriori_seconds = perf_counter() - started
+        supports = levels_to_counts(levels)
+        closed, maximal = find_closed(levels), find_maximal(levels)
         n_total = len(transactions)
-        if analysis_id == "associations":
-            rows = []
-            for itemset, support in supports.items():
-                if len(itemset) < 2:
-                    continue
-                for size in range(1, len(itemset)):
-                    for antecedent in combinations(itemset, size):
-                        consequent = tuple(item for item in itemset if item not in antecedent)
-                        confidence = support / supports[antecedent]
-                        lift = n_total * support / (supports[antecedent] * supports[consequent])
-                        rows.append({"rule_number": len(rows) + 1, "support": support, "confidence": confidence, "lift": lift, "antecedent_size": len(antecedent), "consequent_size": len(consequent)})
-            rules = pd.DataFrame(rows, columns=["rule_number", "support", "confidence", "lift", "antecedent_size", "consequent_size"])
-            if len(rules):
-                rules = rules.sort_values(["lift", "support"], ascending=[False, False]).reset_index(drop=True)
-                rules["rule_number"] = np.arange(1, len(rules) + 1)
-            metrics = {"episodes": n_total, "frequent_itemsets": len(supports), "rules": len(rules), "rules_lift_above_one": int((rules["lift"] > 1).sum()) if len(rules) else 0}
-            tables["rules"] = rules
-            charts = [{"title": f"Rules at minimum support {min_support}", "x_title": "Confidence", "y_title": "Lift", "x": rules["confidence"].tolist(), "y": rules["lift"].tolist()}] if len(rules) else []
+        itemset_rows = [{"members": ", ".join(map(str, itemset)), "size": len(itemset), "support": count, "closed": itemset in closed, "maximal": itemset in maximal} for itemset, count in supports.items()]
+        tables["frequent_itemsets"] = pd.DataFrame(itemset_rows, columns=["members", "size", "support", "closed", "maximal"])
+        tables["apriori_levels"] = level_table
+        if analysis_id == "cohorts":
+            from mlxtend.frequent_patterns import apriori as mlx_apriori
+            started = perf_counter()
+            frequent = mlx_apriori(to_one_hot(transactions), min_support=(min_support - 0.5) / n_total, use_colnames=True, low_memory=True)
+            mlx_counts = mlxtend_to_counts(frequent, n_total)
+            mlx_seconds = perf_counter() - started
+            if mlx_counts != supports:
+                raise ValueError("The repository Apriori and mlxtend results differ; refusing to display unchecked itemsets")
+            canonical_episode_input = n_total == 22530 and params.get("rssi_threshold") == -90 and params.get("min_gathering_size") == 3 and params.get("jaccard_threshold") == 0.7 and params.get("max_gap_slots") == 1
+            if min_support == 200 and canonical_episode_input:
+                observed = (len(supports), sum(len(level) for level in levels[:1]), sum(len(level) for level in levels[1:]), len(levels), len(closed), len(maximal))
+                if observed != (736, 393, 343, 6, 735, 413):
+                    raise ValueError(f"Default cohort check failed: got {observed}, expected (736, 393, 343, 6, 735, 413)")
+            if min_support == 100 and canonical_episode_input and (len(supports), len(levels)) != (9812, 10):
+                raise ValueError(f"Minimum-support check failed at 100: got {(len(supports), len(levels))}, expected (9812, 10)")
+            metrics = {"episodes": n_total, "frequent_itemsets": len(supports), "single_itemsets": sum(len(level) for level in levels[:1]), "groups_of_2_plus": sum(len(level) for level in levels[1:]), "longest_itemset": len(levels), "closed_itemsets": len(closed), "maximal_itemsets": len(maximal), "apriori_runtime_seconds": apriori_seconds, "mlxtend_runtime_seconds": mlx_seconds, "min_support": min_support}
+            charts = [{"title": "Frequent itemsets by size", "x_title": "Participants per itemset", "y_title": "Frequent itemsets", "x": level_table["k"].astype(int).tolist(), "y": level_table["frequent"].astype(int).tolist()}]
         else:
-            not_closed: set[tuple[int, ...]] = set()
-            for itemset, support in supports.items():
-                if len(itemset) >= 2:
-                    for smaller in combinations(itemset, len(itemset) - 1):
-                        if supports.get(smaller) == support:
-                            not_closed.add(smaller)
-            cohorts = {itemset: support for itemset, support in supports.items() if len(itemset) >= 2 and itemset not in not_closed}
-            starts = episodes.set_index("episode_id")["start_time"]
-            ends = episodes.set_index("episode_id")["end_time"]
-            night_share = episodes.set_index("episode_id")["night_share"]
-            rows = []
-            for cohort_number, (cohort, support) in enumerate(cohorts.items(), start=1):
-                matching = [i for i, transaction in enumerate(transactions) if set(cohort).issubset(transaction)]
-                mine = episodes.sort_values("episode_id").iloc[matching].copy()
-                day = (mine["start_time"] // 86400).astype(int)
-                week_day = day % 7
-                hour = mine["start_hour"]
-                large = mine["participant_set"].map(len) >= episodes["participant_set"].map(len).quantile(0.95)
-                sessions, last_end = 0, None
-                for start, end in zip(mine["start_time"], mine["end_time"] + config["time_parameters"]["slot_duration_sec"]):
-                    if last_end is None or start - last_end > 3600:
-                        sessions += 1
-                        last_end = end
-                    else:
-                        last_end = max(last_end, end)
-                lifts = [n_total * support / (supports[tuple(sorted(antecedent))] * supports[tuple(sorted(set(cohort) - set(antecedent)))]) for size in range(1, len(cohort)) for antecedent in combinations(cohort, size)]
-                rows.append({"cohort_number": cohort_number, "size": len(cohort), "support": support, "days_seen": int(day.nunique()), "weeks_seen": int((day // 7).nunique()), "support_first_half": int((day < 14).sum()), "support_second_half": int((day >= 14).sum()), "top_weekday_share": float(week_day.value_counts().iloc[0] / support), "top_hour_share": float(hour.value_counts().iloc[0] / support), "night_episode_share": float((mine["night_share"] >= 0.5).mean()), "night_share_mean": float(mine["night_share"].mean()), "mean_episode_students": float(mine["participant_set"].map(len).mean()), "large_episode_share": float(large.mean()), "support_without_large": int((~large).sum()), "survives_without_large": bool((~large).sum() >= min_support), "sessions_1h": sessions, "min_lift": min(lifts), "max_lift": max(lifts)})
-            cohort_table = pd.DataFrame(rows)
-            if len(cohort_table):
-                cohort_table = cohort_table.sort_values(["support", "size"], ascending=[False, True]).reset_index(drop=True)
-                cohort_table["cohort_number"] = np.arange(1, len(cohort_table) + 1)
-            metrics = {"episodes": n_total, "frequent_itemsets": len(supports), "closed_itemsets": len(cohorts) + len([item for item in supports if item not in not_closed and len(item) < 2]), "cohorts": len(cohorts), "min_support": min_support}
-            tables["cohorts"] = cohort_table
-            if len(cohort_table):
-                sizes = cohort_table["size"].value_counts().sort_index()
-                charts = [{"title": "Closed cohorts by size", "x_title": "Participants in cohort", "y_title": "Cohorts", "x": sizes.index.astype(int).tolist(), "y": sizes.astype(int).tolist()}]
+            from src.models.rules import make_rules
+            rules = make_rules(supports, n_total)
+            if len(rules):
+                rules["antecedent_size"] = rules["antecedent"].map(len)
+                rules["consequent_size"] = rules["consequent"].map(len)
+                rules["antecedent"] = rules["antecedent"].map(lambda group: ", ".join(map(str, group)))
+                rules["consequent"] = rules["consequent"].map(lambda group: ", ".join(map(str, group)))
+            tables["rules"] = rules
+            toy = [frozenset(items) for items in ({1, 2, 3}, {1, 2, 3, 4}, {1, 2, 3}, {2, 4, 5}, {1, 5, 6})]
+            toy_levels, _ = apriori(toy, 2)
+            toy_rules = make_rules(levels_to_counts(toy_levels), len(toy))
+            if len(toy_rules) != 14:
+                raise ValueError(f"Toy rule check failed: got {len(toy_rules)} rules, expected 14")
+            toy_lookup = {(row.antecedent, row.consequent): row for row in toy_rules.itertuples()}
+            if abs(toy_lookup[((1,), (2,))].confidence - 0.75) > 1e-12 or abs(toy_lookup[((1,), (2,))].lift - 0.9375) > 1e-12 or abs(toy_lookup[((1, 2), (3,))].confidence - 1.0) > 1e-12 or abs(toy_lookup[((1, 2), (3,))].lift - (5 / 3)) > 1e-12:
+                raise ValueError("Toy confidence/lift checks failed; refusing to show rule results")
+            toy_rules["antecedent"] = toy_rules["antecedent"].map(lambda group: ", ".join(map(str, group)))
+            toy_rules["consequent"] = toy_rules["consequent"].map(lambda group: ", ".join(map(str, group)))
+            tables["toy_rules"] = toy_rules
+            metrics = {"episodes": n_total, "frequent_itemsets": len(supports), "rules": len(rules), "conf_at_least_0_8": int((rules["confidence"] >= 0.8).sum()), "lift_at_least_50": int((rules["lift"] >= 50).sum()), "both_filters": int(((rules["confidence"] >= 0.8) & (rules["lift"] >= 50)).sum()), "min_support": min_support}
+            canonical_episode_input = n_total == 22530 and params.get("rssi_threshold") == -90 and params.get("min_gathering_size") == 3 and params.get("jaccard_threshold") == 0.7 and params.get("max_gap_slots") == 1
+            if min_support == 200 and canonical_episode_input:
+                observed = (metrics["rules"], metrics["conf_at_least_0_8"], metrics["lift_at_least_50"], metrics["both_filters"])
+                if observed != (2214, 720, 580, 243):
+                    raise ValueError(f"Default rules check failed: got {observed}, expected (2214, 720, 580, 243)")
+            charts = [{"title": f"Rules at minimum support {min_support}", "x_title": "Confidence", "y_title": "Lift", "x": rules["confidence"].tolist(), "y": rules["lift"].tolist()}] if len(rules) else []
     else:
         raise ValueError(f"No interactive computation is registered for {analysis_id}")
 
     for name, frame in tables.items():
         frame.to_csv(run_dir / f"{name}.csv", index=False)
-    summary = {"metrics": metrics, "charts": charts, "tables": {name: frame.head(500).to_dict(orient="records") for name, frame in tables.items()}, "profiles": tables.get("profiles", pd.DataFrame()).to_dict(orient="records"), "parameters": params, "provenance": lineage["provenance"], "note": "Timestamps are relative to the source data origin. Component and episode IDs are specific to these run settings."}
+    summary = {"metrics": metrics, "charts": charts, "tables": {name: (frame if name in {"rules", "frequent_itemsets"} else frame.head(500)).to_dict(orient="records") for name, frame in tables.items()}, "profiles": tables.get("profiles", pd.DataFrame()).to_dict(orient="records"), "parameters": params, "provenance": lineage["provenance"], "note": "Timestamps are relative to the source data origin. Component and episode IDs are specific to these run settings."}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
     return {"metrics": metrics, "artifacts": ["summary.json", *[f"{name}.csv" for name in tables]], "provenance": lineage["provenance"], "charts": charts, "lineage_cache_hit": lineage.get("lineage_cache_hit", False)}

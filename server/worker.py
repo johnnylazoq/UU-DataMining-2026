@@ -79,7 +79,7 @@ def execute_analysis(run_id: str, analysis_id: str, params: dict[str, Any], fres
             metadata["git_revision"] = subprocess.run(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, check=True, capture_output=True, text=True, timeout=3).stdout.strip()
         except (OSError, subprocess.SubprocessError):
             metadata["git_revision"] = None
-        identity = cache_key(analysis_id, "interactive-v2", fingerprints, params)
+        identity = cache_key(analysis_id, "interactive-v3", fingerprints, params)
         metadata["cache_key"] = identity
         upstream = {
             "rssi_threshold": params.get("rssi_threshold", config["bluetooth_parameters"]["rssi_threshold"]),

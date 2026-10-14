@@ -378,10 +378,11 @@ The current prototype includes an exploratory Streamlit dashboard and notebooks.
 - View gathering-size distribution.
 - Inspect gathering ID, slot, participant count, timestamps, and median RSSI.
 
-### 4. Planned analysis views
+### 4. Implemented analysis views
 
-- Recurring cohorts, clustering, anomaly scores, and forecasting are planned analysis
-  surfaces and are not yet exposed by the current dashboard.
+- The dashboard exposes recurring cohorts, clustering, episode linking, and
+  association rules using the checked repository implementations. Anomaly and
+  forecasting views are not part of the current web app.
 
 ### 5. Forecast view
 
@@ -468,7 +469,7 @@ contacts → gatherings → episodes → communication-feature dependency chain,
 produce run-scoped reports with validated controls, history, cache provenance, and
 downloadable artifacts. Cohort minimum support follows the notebook's 200-episode
 baseline. Association rules are mined from the same run-specific episode lineage;
-anomaly analysis and forecasting remain planned. See
+the app exposes no anomaly analysis. Forecasting remains a future project. See
 [docs/interactive-app.md](./docs/interactive-app.md).
 
 ---
