@@ -403,8 +403,11 @@ The current prototype includes an exploratory Streamlit dashboard and notebooks.
 
 ## Current Implementation
 
-The repository currently includes a modular preprocessing pipeline and a Streamlit
-dashboard.
+The repository includes a modular preprocessing pipeline, a Streamlit dashboard, and
+an interactive web application. The interactive app runs the implemented Bluetooth,
+gathering, episode, clustering, cohort, and association-rule analyses in a background
+Python worker. Anomaly detection remains planned; see
+[docs/interactive-app.md](./docs/interactive-app.md) for startup, controls, and limits.
 
 ### Command-line pipeline
 
@@ -455,6 +458,18 @@ Parquet files. It currently includes:
 
 The dashboard is descriptive and aggregate. It does not identify people, assign
 semantic event labels, or make individual decisions.
+
+### Next.js research application
+
+The App Router interface runs with a FastAPI service and Redis/RQ worker through
+Docker Compose. It displays saved, labeled baselines and aggregate Bluetooth,
+gathering, episode, and cohort summaries. Interactive runs recompute the configured
+contacts → gatherings → episodes → communication-feature dependency chain, then
+produce run-scoped reports with validated controls, history, cache provenance, and
+downloadable artifacts. Cohort minimum support follows the notebook's 200-episode
+baseline. Association rules are mined from the same run-specific episode lineage;
+anomaly analysis and forecasting remain planned. See
+[docs/interactive-app.md](./docs/interactive-app.md).
 
 ---
 

@@ -1,0 +1,10 @@
+**
+!requirements-app.txt
+!requirements.txt
+!pyproject.toml
+!server/
+!server/**
+!src/
+!src/**
+!web/
+!web/**

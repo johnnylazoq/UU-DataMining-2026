@@ -1,0 +1,72 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    mem_limit: 512m
+    cpus: 0.5
+    restart: unless-stopped
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./config:/workspace/config:ro
+      - ./data:/workspace/data:ro
+      - ./outputs/tables:/workspace/outputs/tables:ro
+      - ./outputs/models:/workspace/outputs/models:ro
+      - ./outputs/app_runs:/workspace/outputs/app_runs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 2g
+    cpus: 1.0
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "--name", "campusgather-worker", "campusgather"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./config:/workspace/config:ro
+      - ./data:/workspace/data:ro
+      - ./outputs/tables:/workspace/outputs/tables:ro
+      - ./outputs/models:/workspace/outputs/models:ro
+      - ./outputs/app_runs:/workspace/outputs/app_runs
+    depends_on:
+      redis:
+        condition: service_healthy
+    mem_limit: 4g
+    cpus: 2.0
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  redis-data:

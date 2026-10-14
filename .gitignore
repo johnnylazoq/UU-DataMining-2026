@@ -26,6 +26,9 @@ data/processed/*
 outputs/figures/*
 outputs/tables/*
 outputs/models/*
+outputs/app_runs/*
+web/node_modules/
+web/.next/
 
 # Keep directory placeholders visible in Git
 !data/raw/.gitkeep
@@ -37,6 +40,7 @@ outputs/models/*
 # Cohort table handed to the null-model work (343 rows); rerun: notebooks/cohort_analysis.ipynb
 !outputs/tables/recurring_cohorts.csv
 !outputs/models/.gitkeep
+!outputs/app_runs/.gitkeep
 
 # Editor and OS files
 .vscode/*

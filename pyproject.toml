@@ -18,10 +18,17 @@ dependencies = [
     "jupyter",
     "streamlit",
     "pyyaml",
+    "fastapi",
+    "uvicorn[standard]",
+    "redis",
+    "rq",
 ]
 
 [tool.setuptools]
 py-modules = ["main"]
+
+[project.optional-dependencies]
+test = ["pytest"]
 
 [tool.setuptools.packages.find]
 where = ["."]

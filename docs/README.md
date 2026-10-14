@@ -6,3 +6,4 @@ Place project documentation in this directory:
 - `episodes.md`: episode definition, schema, how to build, RSSI sensitivity.
 - `methodology.md`: analytical definitions and assumptions.
 - `presentation_outline.md`: report and presentation structure.
+- [Gathering episode clustering](clustering.md)
