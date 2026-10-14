@@ -45,3 +45,5 @@ outputs/models/*
 !.vscode/launch.json
 .DS_Store
 Thumbs.db
+outputs/anomalies/*
+!outputs/anomalies/.gitkeep
